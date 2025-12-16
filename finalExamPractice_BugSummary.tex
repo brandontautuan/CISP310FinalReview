@@ -1,0 +1,302 @@
+\documentclass[9pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{geometry}
+\geometry{a4paper, margin=0.4in, top=0.3in, bottom=0.3in}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{parskip}
+\usepackage{fancyhdr}
+
+% Remove header/footer spacing
+\pagestyle{plain}
+\setlength{\headheight}{0pt}
+\setlength{\headsep}{0pt}
+\setlength{\footskip}{10pt}
+
+% Compact spacing for sections
+\titlespacing*{\section}{0pt}{3pt}{1pt}
+\titlespacing*{\subsection}{0pt}{2pt}{0.5pt}
+\titlespacing*{\subsubsection}{0pt}{1.5pt}{0pt}
+\titlespacing*{\paragraph}{0pt}{0.5pt}{0pt}
+
+% Compact lists
+\setlist{nosep, leftmargin=12pt, itemsep=0pt, parsep=0pt, topsep=1pt, partopsep=0pt}
+\setenumerate{nosep, leftmargin=12pt, itemsep=0pt, parsep=0pt, topsep=1pt}
+\setitemize{nosep, leftmargin=12pt, itemsep=0pt, parsep=0pt, topsep=1pt}
+
+% Reduce paragraph spacing
+\setlength{\parskip}{1pt}
+\setlength{\parindent}{0pt}
+\setlength{\baselineskip}{10pt}
+
+% Compact code listings - preserves ALL comments
+\lstset{
+    basicstyle=\ttfamily\scriptsize,
+    breaklines=true,
+    frame=single,
+    framesep=2pt,
+    numbers=left,
+    numbersep=3pt,
+    numberstyle=\tiny\color{gray},
+    xleftmargin=5pt,
+    xrightmargin=5pt,
+    aboveskip=2pt,
+    belowskip=2pt,
+    showstringspaces=false,
+    keepspaces=true,
+    tabsize=2,
+    commentstyle=\color{gray!70}\itshape,
+    keywordstyle=\color{blue}\bfseries,
+    stringstyle=\color{red!70},
+    escapeinside={@*}{*@},
+}
+
+\title{Finalexampractice Bugsummary}
+\author{}
+\date{}
+
+\begin{document}
+
+\maketitle
+\vspace{-10pt}
+
+\section{Bug Summary - Quick Reference}
+
+\subsection{Critical Bugs Found and Fixed}
+
+\subsubsection{1. **Line 60: Missing Stack Initialization**}
+\begin{lstlisting}[language={[x86masm]Assembler}, commentstyle=\color{gray}\itshape]
+// BUG:
+ldi d,
+
+// FIX:
+ldi d, 0        // Initialize stack pointer to 0
+\end{lstlisting}
+
+\subsubsection{2. **Line 107: Wrong Type Size for fPtr**}
+\begin{lstlisting}[language={[x86masm]Assembler}, commentstyle=\color{gray}\itshape]
+// BUG:
+isLoop_result: isLoop_fPtr Node_size +
+
+// FIX:
+isLoop_result: isLoop_fPtr 1 +  // fPtr is a pointer (1 byte), not a Node (2 bytes)
+\end{lstlisting}
+
+\subsubsection{3. **Line 112: Invalid Syntax for Allocation**}
+\begin{lstlisting}[language={[x86masm]Assembler}, commentstyle=\color{gray}\itshape]
+// BUG:
+ldi c,0 isLoop_lvs -
+add d,c
+
+// FIX:
+ldi c, isLoop_lvs  // Load local var size
+sub d, c            // Allocate locals (subtract from stack pointer)
+\end{lstlisting}
+
+\subsubsection{4. **Lines 119-121: Incorrect Parameter Access**}
+\begin{lstlisting}[language={[x86masm]Assembler}, commentstyle=\color{gray}\itshape]
+// BUG:
+ldi a,isLoop_pNode
+ld a,(a)           // Tries to dereference offset, not parameter!
+
+// FIX:
+ldi a, isLoop_pNode // A = offset to parameter
+add a, d            // A = address of parameter
+ld a, (a)           // A = value of parameter
+\end{lstlisting}
+
+\subsubsection{5. **Lines 124-129: Incorrect prevFrame Assignment**}
+\begin{lstlisting}[language={[x86masm]Assembler}, commentstyle=\color{gray}\itshape]
+// BUG:
+ldi a,isLoop_prevFrame
+add a,d
+ldi c,Frame_prevFrame Frame_pNode -  // Wrong calculation
+add b,c
+
+// FIX:
+ldi a, isLoop_prevFrame // A = offset to prevFrame parameter
+add a, d                // A = address of prevFrame parameter
+ld a, (a)               // A = prevFrame value
+ldi b, isLoop_f
+add b, Frame_prevFrame  // B = offset to f.prevFrame
+add b, d                // B = address of f.prevFrame
+st (b), a               // f.prevFrame = prevFrame
+\end{lstlisting}
+
+\subsubsection{6. **Lines 136-137: Wrong Parameter Access (Struct Member vs Parameter)**}
+\begin{lstlisting}[language={[x86masm]Assembler}, commentstyle=\color{gray}\itshape]
+// BUG:
+ldi a,Frame_prevFrame  // This is struct MEMBER offset, not parameter!
+ld a,(a)               // Wrong!
+
+// FIX:
+ldi a, isLoop_prevFrame // A = offset to prevFrame PARAMETER
+add a, d                // A = address of prevFrame parameter
+ld a, (a)               // A = prevFrame parameter value
+\end{lstlisting}
+
+\subsubsection{7. **Lines 156-162: Wrong Offset for pNode Parameter**}
+\begin{lstlisting}[language={[x86masm]Assembler}, commentstyle=\color{gray}\itshape]
+// BUG:
+ldi c,Frame_pNode 1 +  // This gives 1, not parameter offset!
+add c,d                // C = D+1 (points to f.prevFrame, not pNode!)
+ld c,(c)               // Loads wrong value
+
+// FIX:
+ldi c, isLoop_pNode // C = 5 (offset to pNode parameter)
+inc c                // C = 6 (adjust for the push: dec d, st (d),c)
+add c, d             // C = D+6 (address of pNode parameter)
+ld c, (c)            // C = pNode parameter value
+\end{lstlisting}
+
+\subsubsection{8. **Line 162: Wrong Jump Condition**}
+\begin{lstlisting}[language={[x86masm]Assembler}, commentstyle=\color{gray}\itshape]
+// BUG:
+jzi isLoop_then0_while0_begin  // Loops forever if fPtr->pNode == pNode!
+
+// FIX:
+jzi isLoop_then0_while0_end    // Exit loop when fPtr->pNode == pNode
+\end{lstlisting}
+
+\subsubsection{9. **Line 169: Wrong Register for Storing fPtr**}
+\begin{lstlisting}[language={[x86masm]Assembler}, commentstyle=\color{gray}\itshape]
+// BUG:
+st (c),b  // Register c doesn't contain fPtr address here!
+
+// FIX:
+// After computing fPtr->prevFrame in register C:
+// Register B contains address of fPtr variable (from earlier)
+st (b), c  // Store new fPtr value back to fPtr variable
+\end{lstlisting}
+
+\subsubsection{10. **Line 172: Register c Doesn't Contain fPtr**}
+\begin{lstlisting}[language={[x86masm]Assembler}, commentstyle=\color{gray}\itshape]
+// BUG:
+and c,c  // Testing wrong register - c was used for other things!
+
+// FIX:
+ldi c, isLoop_fPtr  // C = offset to fPtr variable
+add c, d            // C = address of fPtr variable
+ld c, (c)           // C = fPtr value
+and c, c            // Test if fPtr == 0
+\end{lstlisting}
+
+\subsubsection{11. **Line 182: Wrong Offset for pNode in Recursive Call**}
+\begin{lstlisting}[language={[x86masm]Assembler}, commentstyle=\color{gray}\itshape]
+// BUG:
+ldi b,isLoop_pNode 1 +  // 5+1=6, but after push it's wrong offset
+add b,d
+ld b,(b)
+
+// FIX:
+// After push: dec d, st (d),c (push &f)
+// pNode was at D+5, now at D+6 (frame base moved from D to D+1)
+ldi b, isLoop_pNode // B = 5
+inc b               // B = 6 (adjust for push)
+add b, d            // B = D+6 (address of pNode parameter)
+ld b, (b)           // B = pNode parameter value
+\end{lstlisting}
+
+\subsubsection{12. **Line 218: Missing Value for prevFrame Argument**}
+\begin{lstlisting}[language={[x86masm]Assembler}, commentstyle=\color{gray}\itshape]
+// BUG:
+ldi a,  // No value!
+
+// FIX:
+ldi a, 0  // Push 0 as prevFrame argument
+\end{lstlisting}
+
+\subsubsection{13. **Line 232: Missing Value for Argument Cleanup**}
+\begin{lstlisting}[language={[x86masm]Assembler}, commentstyle=\color{gray}\itshape]
+// BUG:
+ldi b,  // No value!
+add d,b
+
+// FIX:
+inc d  // Clean up first argument
+inc d  // Clean up second argument
+\end{lstlisting}
+
+\subsubsection{14. **Line 199: Wrong Label Name**}
+\begin{lstlisting}[language={[x86masm]Assembler}, commentstyle=\color{gray}\itshape]
+// BUG:
+isLoop_endif0:  // But jump at line 132 goes to isLoop_endif
+
+// FIX:
+isLoop_endif:  // Match the label name used in jzi
+\end{lstlisting}
+
+\hrule
+
+\subsection{Common Patterns to Watch For}
+
+\begin{enumerate}
+\item \textbf{Parameter Access Pattern}:
+\end{enumerate}
+\begin{lstlisting}[language={[x86masm]Assembler}, commentstyle=\color{gray}\itshape]
+   ldi reg, param_offset  // Load offset
+   add reg, d             // Compute address (D is stack pointer)
+   ld reg, (reg)          // Load value
+\end{lstlisting}
+
+\begin{enumerate}
+\item \textbf{Local Variable Access Pattern}:
+\end{enumerate}
+\begin{lstlisting}[language={[x86masm]Assembler}, commentstyle=\color{gray}\itshape]
+   ldi reg, local_offset  // Load offset (usually small, like 0, 1, 2...)
+   add reg, d             // Compute address (D points to frame base)
+   ld/st (reg), ...       // Access value
+\end{lstlisting}
+
+\begin{enumerate}
+\item \textbf{Struct Member Access Pattern}:
+\end{enumerate}
+\begin{lstlisting}[language={[x86masm]Assembler}, commentstyle=\color{gray}\itshape]
+   ldi reg, struct_base   // Load base address of struct
+   add reg, member_offset // Add member offset (e.g., Frame_pNode = 0)
+   ld/st (reg), ...       // Access member
+\end{lstlisting}
+
+\begin{enumerate}
+\item \textbf{Stack Balance Check}:
+\end{enumerate}
+   - Before function call: count \texttt{dec d} (pushes)
+   - After function call: count \texttt{inc d} (pops)
+   - Should differ by exactly 1 (the return address, popped by callee)
+
+\hrule
+
+\subsection{Register Tracking Tips}
+
+\begin{itemize}
+\item \textbf{Always track what each register contains} at each point
+\item \textbf{Write comments} showing the C code concept each register represents
+\item \textbf{Check for overwrites} before using a register value
+\item \textbf{Use temporary saves} on stack if needed during complex operations
+\end{itemize}
+
+\hrule
+
+\subsection{Stack Frame Visualization}
+
+For \texttt{isLoop} function:
+\begin{verbatim}
+After allocation:
+D+6: prevFrame (parameter 2)
+D+5: pNode (parameter 1)
+D+4: return address
+D+3: result (local variable)
+D+2: fPtr (local variable)
+D+1: f.prevFrame (member of local struct f)
+D+0: f.pNode (member of local struct f) ← D points here
+\end{verbatim}
+
+Key insight: \textbf{Offsets are always relative to where D points after allocation!}
+
+
+\end{document}

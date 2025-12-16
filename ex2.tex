@@ -1,0 +1,138 @@
+\documentclass[9pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{geometry}
+\geometry{a4paper, margin=0.4in, top=0.3in, bottom=0.3in}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{parskip}
+\usepackage{fancyhdr}
+
+% Remove header/footer spacing
+\pagestyle{plain}
+\setlength{\headheight}{0pt}
+\setlength{\headsep}{0pt}
+\setlength{\footskip}{10pt}
+
+% Compact spacing for sections
+\titlespacing*{\section}{0pt}{3pt}{1pt}
+\titlespacing*{\subsection}{0pt}{2pt}{0.5pt}
+\titlespacing*{\subsubsection}{0pt}{1.5pt}{0pt}
+\titlespacing*{\paragraph}{0pt}{0.5pt}{0pt}
+
+% Compact lists
+\setlist{nosep, leftmargin=12pt, itemsep=0pt, parsep=0pt, topsep=1pt, partopsep=0pt}
+\setenumerate{nosep, leftmargin=12pt, itemsep=0pt, parsep=0pt, topsep=1pt}
+\setitemize{nosep, leftmargin=12pt, itemsep=0pt, parsep=0pt, topsep=1pt}
+
+% Reduce paragraph spacing
+\setlength{\parskip}{1pt}
+\setlength{\parindent}{0pt}
+\setlength{\baselineskip}{10pt}
+
+% Compact code listings - preserves ALL comments
+\lstset{
+    basicstyle=\ttfamily\scriptsize,
+    breaklines=true,
+    frame=single,
+    framesep=2pt,
+    numbers=left,
+    numbersep=3pt,
+    numberstyle=\tiny\color{gray},
+    xleftmargin=5pt,
+    xrightmargin=5pt,
+    aboveskip=2pt,
+    belowskip=2pt,
+    showstringspaces=false,
+    keepspaces=true,
+    tabsize=2,
+    commentstyle=\color{gray!70}\itshape,
+    keywordstyle=\color{blue}\bfseries,
+    stringstyle=\color{red!70},
+    escapeinside={@*}{*@},
+}
+
+\title{Ex2}
+\author{}
+\date{}
+
+\begin{document}
+
+\maketitle
+\vspace{-10pt}
+
+unsigned f(unsigned n)
+{
+  return (n==0) ? 1 : 2*f(n-1);
+}
+
+int main()
+{
+  unsigned x;
+  x = f(3);
+  return 0;
+}
+
+  nop // to get the CMD mode of logisim to work
+  jmpi main 
+
+f:
+  // stack: [retAddr] n ...
+  retAddr: 0
+  n: 1
+  ldi  a,n   // a == 1
+  add  a,d   // a == 1+SP == &n
+  ld   a,(a) // a == \textit{a == }(&n) == n
+  and  a,a   // a = (a & a), Z flag is affected
+             // Z==1 iff a==0
+  jzi  f_then // n == 0
+  // n != 0, n > 0
+  // else expr
+  // f(n-1)
+  // push n-1
+  // regA already has n
+  dec a // a == n-1
+  dec d
+  st  (d),a // push n-1
+  // push ret addr
+  dec d
+  ldi a,. 5 +
+  st  (d),a // push ret addr
+  // jmpi f
+  jmpi f
+  // clean up the arg
+  inc  d
+  // make use of ret val
+  add  a,a // a == 2*f(n-1)
+  jmpi f_ret
+f_then:
+  ldi  a,1 // ret val of 1
+
+f_ret:
+  ld   b,(d) // b == retAddr
+  inc  d
+  jmp  b
+
+main:
+  // [x]
+  x: 0
+  dec  d
+  // we are done allocating for the local var
+  ldi  a,3
+  dec  d
+  st   (d),a
+  dec  d
+  ldi  a,. 5 +
+  st   (d),a
+  jmpi f
+  inc  d
+  ldi  b,x  // b == 0
+  add  b,d  // b == &x
+  st   (b),a  // x = f(3)
+  inc  d    // dealloc x
+  halt
+\end{document}

@@ -1,0 +1,133 @@
+\documentclass[9pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{geometry}
+\geometry{a4paper, margin=0.4in, top=0.3in, bottom=0.3in}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{parskip}
+\usepackage{fancyhdr}
+
+% Remove header/footer spacing
+\pagestyle{plain}
+\setlength{\headheight}{0pt}
+\setlength{\headsep}{0pt}
+\setlength{\footskip}{10pt}
+
+% Compact spacing for sections
+\titlespacing*{\section}{0pt}{3pt}{1pt}
+\titlespacing*{\subsection}{0pt}{2pt}{0.5pt}
+\titlespacing*{\subsubsection}{0pt}{1.5pt}{0pt}
+\titlespacing*{\paragraph}{0pt}{0.5pt}{0pt}
+
+% Compact lists
+\setlist{nosep, leftmargin=12pt, itemsep=0pt, parsep=0pt, topsep=1pt, partopsep=0pt}
+\setenumerate{nosep, leftmargin=12pt, itemsep=0pt, parsep=0pt, topsep=1pt}
+\setitemize{nosep, leftmargin=12pt, itemsep=0pt, parsep=0pt, topsep=1pt}
+
+% Reduce paragraph spacing
+\setlength{\parskip}{1pt}
+\setlength{\parindent}{0pt}
+\setlength{\baselineskip}{10pt}
+
+% Compact code listings - preserves ALL comments
+\lstset{
+    basicstyle=\ttfamily\scriptsize,
+    breaklines=true,
+    frame=single,
+    framesep=2pt,
+    numbers=left,
+    numbersep=3pt,
+    numberstyle=\tiny\color{gray},
+    xleftmargin=5pt,
+    xrightmargin=5pt,
+    aboveskip=2pt,
+    belowskip=2pt,
+    showstringspaces=false,
+    keepspaces=true,
+    tabsize=2,
+    commentstyle=\color{gray!70}\itshape,
+    keywordstyle=\color{blue}\bfseries,
+    stringstyle=\color{red!70},
+    escapeinside={@*}{*@},
+}
+
+\title{Ex3}
+\author{}
+\date{}
+
+\begin{document}
+
+\maketitle
+\vspace{-10pt}
+
+unsigned strlen(const char *str)
+{
+  return (*str) ? 1+strlen(str+1) : 0;
+}
+
+int main()
+{
+  unsigned x;
+  x = strlen("Tak");
+  return 0;
+}
+
+nop
+ldi  d,0
+jmpi main
+
+strlen:
+  // [retAddr] str
+  retAddr: 0
+  str: 1
+  ldi  c,str
+  add  c,d
+  ld   c,(c)  // c == str
+  ld   b,(c)  // b == \textit{(c) == }(str)
+  and  b,b
+  ldi  a,0    // let's assume it is an empty str
+  jzi  strlen_isNull
+  // is not null
+  inc  c // a == str+1
+  dec  d
+  st   (d),c // push str+1
+  dec  d
+  ldi  a,. 5 +
+  st   (d),a // push ret addr
+  jmpi strlen
+  inc  d
+  // a == strlen(str+1)
+  inc  a
+strlen_isNull:
+  ld   b,(d)
+  inc  d
+  jmp  b
+
+__lit_str1:
+  byte 84
+  byte 97
+  byte 107
+  byte 0
+main:
+  // [x]
+  dec  d
+  x: 0
+  dec  d
+  ldi  a,__lit_str1
+  st   (d),a // push "Tak"
+  dec  d
+  ldi  a,. 5 +
+  st   (d),a  // push ret addr
+  jmpi strlen
+  inc  d
+  ldi  b,x
+  add  b,d
+  st   (b),a  // x = strlen("Tak")
+  inc  d
+  halt
+\end{document}
